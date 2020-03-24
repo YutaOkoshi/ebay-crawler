@@ -5,10 +5,13 @@ BOT_NAME = 'ebay_crawler'
 SPIDER_MODULES = ['ebay_crawler.spiders']
 NEWSPIDER_MODULE = 'ebay_crawler.spiders'
 
-ROBOTSTXT_OBEY = True
+# ROBOTSTXT_OBEY = True
+
+# UA 変更
+USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/80.0.3987.132 Safari/537.36'
 
 # リクエスト間隔
-DOWNLOAD_DELAY = 3
+DOWNLOAD_DELAY = 5
 
 # キャッシュ有効か
 HTTPCACHE_ENABLED = True

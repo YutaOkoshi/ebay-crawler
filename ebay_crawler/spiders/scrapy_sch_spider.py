@@ -1,27 +1,90 @@
 # -*- coding: utf-8 -*-
 import scrapy
 
-from ebay_crawler.items import Post
+from ebay_crawler.items import Sch
 
 class ScrapySchSpiderSpider(scrapy.Spider):
     name = 'scrapy_sch_spider'
     allowed_domains = ['www.ebay.com']
     start_urls = [
-        'https://www.ebay.com/sch/i.html?_from=R40&_sacat=0&_nkw=dragonball&LH_PrefLoc=6&rt=nc&LH_Sold=1&LH_Complete=1&_ipg=200'
+        'https://www.ebay.com/sch/i.html?_nkw=airsoft'
         ]
+    # Allow a custom parameter (-a flag in the scrapy command)
+    def __init__(self, search="nintendo switch console"):
+        self.search_string = search
 
     def parse(self, response):
         """
         レスポンスに対するパース処理
         """
 
-        # srp-river-results-listing9 > div > div.s-item__info.clearfix > a
-        # /html/body/div[4]/div[5]/div[2]/div[1]/div[2]/ul/li[9]/div/div[2]/a
-        for post in response.css('srp-river-results-listing9 > div > div.s-item__info.clearfix > a'):
+        # Extrach the trksid to build a search request
+        trksid = response.css("input[type='hidden'][name='_trksid']").xpath("@value").extract()[0]
 
-            print(post)
-            yield Post(
-                url=post.css('a.s-item__link a::attr(href)').extract_first().strip(),
-                title=post.css('a.s-item__link a::text').extract_first().strip(),
-                date=post.css('a.s-item__link span.date a::text').extract_first().strip(),
-            )
+        # Build the url and start the requests
+        yield scrapy.Request("http://www.ebay.com/sch/i.html?_from=R40&_trksid=" + trksid +
+                             "&_nkw=" + self.search_string.replace(' ','+') + "&_ipg=200",
+                             callback=self.parse_link)
+                                # Parse the search results
+
+    def parse_link(self, response):
+        # Extract the list of products
+        results = response.xpath('//div/div/ul/li[contains(@class, "s-item" )]')
+
+        # Extract info for each product
+        for product in results:
+            name = product.xpath('.//*[@class="s-item__title"]//text()').extract_first()
+            # Sponsored or New Listing links have a different class
+            if name == None:
+                name = product.xpath('.//*[@class="s-item__title s-item__title--has-tags"]/text()').extract_first()
+                if name == None:
+                    name = product.xpath('.//*[@class="s-item__title s-item__title--has-tags"]//text()').extract_first()
+            if name == 'New Listing':
+                tmp = product.xpath('.//*[@class="s-item__title"]//text()').extract()
+                if len(tmp) >= 2:
+                    name = product.xpath('.//*[@class="s-item__title"]//text()').extract()[1]
+                else:
+                    # print("\n"+"■"*30)
+                    # print(product.xpath('.//*[@class="s-item__title"]//text()').extract())
+                    name = None
+
+            # If this get a None result
+            if name == None:
+                name = "ERROR"
+
+            price = product.xpath('.//*[@class="s-item__price"]/text()').extract_first()
+            status = product.xpath('.//*[@class="SECONDARY_INFO"]/text()').extract_first()
+            seller_level = product.xpath('.//*[@class="s-item__etrs-text"]/text()').extract_first()
+            location = product.xpath('.//*[@class="s-item__location s-item__itemLocation"]/text()').extract_first()
+            link = product.xpath('.//a[@class="s-item__link"]/@href').extract_first()
+
+            # Set default values
+            stars = 0
+            ratings = 0
+
+            stars_text = product.xpath('.//*[@class="clipped"]/text()').extract_first()
+            if stars_text: stars = stars_text[:3]
+            ratings_text = product.xpath('.//*[@aria-hidden="true"]/text()').extract_first()
+            if ratings_text: ratings = ratings_text.split(' ')[0]
+
+            yield{
+            "Name":name,
+            "Status":status,
+            #"Seller_Level":seller_level,
+            #"Location":location,
+            "Price":price,
+            "Stars":stars,
+            "Ratings":ratings,
+            "Link":link
+            }
+
+        # Get the next page
+        next_page_url = response.xpath('//*/a[@class="x-pagination__control"][2]/@href').extract_first()
+
+        # The last page do not have a valid url and ends with '#'
+        if next_page_url == None or str(next_page_url).endswith("#"):
+            self.log("eBay products collected successfully !!!")
+        else:
+            print('\n'+'-'*30)
+            print('Next page: {}'.format(next_page_url))
+            yield scrapy.Request(next_page_url, callback=self.parse_link)
