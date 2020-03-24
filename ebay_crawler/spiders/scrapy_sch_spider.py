@@ -54,8 +54,8 @@ class ScrapySchSpiderSpider(scrapy.Spider):
 
             price = product.xpath('.//*[@class="s-item__price"]/text()').extract_first()
             status = product.xpath('.//*[@class="SECONDARY_INFO"]/text()').extract_first()
-            seller_level = product.xpath('.//*[@class="s-item__etrs-text"]/text()').extract_first()
-            location = product.xpath('.//*[@class="s-item__location s-item__itemLocation"]/text()').extract_first()
+            # seller_level = product.xpath('.//*[@class="s-item__etrs-text"]/text()').extract_first()
+            # location = product.xpath('.//*[@class="s-item__location s-item__itemLocation"]/text()').extract_first()
             link = product.xpath('.//a[@class="s-item__link"]/@href').extract_first()
 
             # Set default values
